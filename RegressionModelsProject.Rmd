@@ -1,0 +1,80 @@
+---
+title: "Mtcars Analysis"
+author: "courserans"
+date: "February 20, 2015"
+output:
+  html_document:
+    keep_md: yes
+---
+
+### Executive summary
+
+The "mtcars"" dataset was analysed using a combination of linear regression model and t.test to answer the 2 questions mentioned below. The mtcars dataset comprises of fuel consumption(mpg) and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models). Based on the below analysis we conclude
+
+* Manual transmission cars gives a **better** mpg than automatic transmission cars for lighter vehicles(wt < `r round(14.079/4.141,2)`). For vehicles with wt > `r round(14.079/4.141,2)` automatic transmission vehicles provides better mpg. 
+* The linear model mpg = 9.723 -2.936wt+1.017qsec+14.079am-4.141wt x am best models this dataset. This linear model implies that for a given qsec, a 1000 lb manual transmision car will provide **`r 14.079-4.141*1` more** miles per gallon(mpg) than an automatic transmission car. However for a given qsec a 4000 lb manual transmission car will provide **`r 4.141*4 - 14.079` less** mpg than an automatic transmission car. 
+
+#### Q.1 “Is an automatic or manual transmission better for MPG”
+
+**Fig1** (refer appendix) indicates that there is a perceptible difference in the means between an automatic and manual transmission car. Manual transmission car seems to have better mpg. We conduct a t.test hypothesis testing to identify if the difference in means is statistically significant.  
+```{r,echo=TRUE}
+amttest <- t.test(mpg~am,data=mtcars)
+```
+Based on the t.test we observe that difference in means of mpg between the automatic and manual transmission is **`r round((amttest$estimate[[2]] - amttest$estimate[[1]]),3)`** miles per gallon.Since the p value is **`r round(amttest$p.value,3)`** we reject the null hypothesis that the means are same. Based on the hypothesis testing we can conclude that the manual transmission is **better** than the automatic transmission for mpg.
+
+#### Q.2. "Quantify the MPG difference between automatic and manual transmissions"
+
+To quantify the mpg difference we fit a simple linear model, with mpg as the response and am as the predictor.
+
+```{r, echo=TRUE}
+fit <- lm(mpg ~ factor(am),data=mtcars)
+summary(fit)$coeff
+```
+We observe from the coefficients that mpg for automatic cars is **`r round(fit$coef[[1]],2)`** and that manual increases the mpg by **`r round(fit$coef[[2]],2)`**. However the R2 values is **`r round(summary(fit)$r.squared,3)`** which explains only **`r paste(round(summary(fit)$r.squared*100,2),"%")`** of the variance. Hence we must add additional predictor variables to arrive at a higher R2 and consequently a better fit.
+
+##### Model selection
+
+The model selection approach used in this analysis is backward selection strategy. As per this approach we start by fitting a linear model with all the response variables. Then identify the predictor variable with the largest p-value, refit a new model minus the variable with the largest p value, reassess for significance and adjusted R2 till we arrive at the most optimal model. 
+```{r, echo=TRUE}
+fit1 <- lm(mpg ~.,data=mtcars)
+fit2 <- lm(mpg ~disp+hp+drat+wt+qsec+vs+am+gear+carb,data=mtcars) #cyl dropped
+fit3 <- lm(mpg ~disp+hp+drat+wt+qsec+am+gear+carb,data=mtcars)    #vs  dropped
+fit4 <- lm(mpg ~disp+hp+drat+wt+qsec+am+gear,data=mtcars)         #carb dropped
+fit5 <- lm(mpg ~disp+hp+drat+wt+qsec+am,data=mtcars)              #gear dropped
+fit6 <- lm(mpg ~disp+hp+wt+qsec+am,data=mtcars)                   #drat dropped
+fit7 <- lm(mpg ~hp+wt+qsec+am,data=mtcars)                        #hp   dropped
+fit8 <- lm(mpg ~wt+qsec+am,data=mtcars) 
+```
+All the predictor variables in the fit8 model are highly significant(Appendix). The adjusted R2 value is **`r round(summary(fit8)$r.squared,3)`**. However **Fig2** (Appendix) indicates a possibility of interaction effect between am and the wt variable. A new linear model(fit9) with main effects (wt + qsec + am) and the interaction effect(am:wt) is constructed. We conduct a anova test between fit8 and fit9 models to identify if the effect of interaction is statistically significant.
+```{r,echo=TRUE}
+fit9 <- lm(mpg ~wt+qsec+am+am:wt,data=mtcars)
+anova(fit8,fit9)$Pr[[2]]
+```
+Based on the p value we can conclude that interaction effect is necessary. Hence we select fit9 : mpg ~wt+qsec+am+am:wt as the final model. This model has an adjusted R2 **`r round(summary(fit9)$r.squared,3)`** and all the main effect and the interaction effect is significant. This linear model implies that for a given qsec a 1000 lb manual transmision car will provide **`r 14.079-4.141*1` more** miles per gallon(mpg) than an automatic transmission car. However for a given qsec a 4000 lb manual transmission car will provide **`r 4.141*4 - 14.079` less** mpg than an automatic transmission car. 
+```{r,echo=TRUE}
+summary(fit9)$coeff
+```
+
+##### Model Diagnostics
+We observe that the residuals plot does not show any obvious pattern. The normal Q-Q plot the standardized residuals are on a line. One of the assumptions of the model is that error terms have a common variance. The scale location plot indicates the same. The standardized residual vs leverage plot also does not indicate any outlier points with significant effect or influence. Hence the applicability of a linear model to the dataset seems appropriate.
+
+##### Appendix
+
+* Exploratory Plots
+```{r, fig.align='center', fig.height= 4, fig.width=5, fig.path='fig/'}
+library(ggplot2)
+ggplot(mtcars, aes(factor(am), mpg)) + geom_boxplot(aes(fill=factor(am))) + labs(title="Fig 1: Exploratory Data plot of mpg vs am") + theme_bw()
+
+g1 <- ggplot(data=mtcars, aes(x=wt, y=mpg, colour=factor(am))) + geom_point() + stat_smooth(method="lm") + labs(title="Fig 2: Interaction plot of am vs wt") + theme_bw()
+g1
+```
+* Diagnostic Plots
+```{r, fig.align='center', fig.height= 7, fig.width=7, fig.path='fig/'}
+par(mfrow = c(2, 2))
+plot(fit9)
+```
+* Test Summaries
+```{r}
+summary(fit8)
+summary(fit9) #Final Model
+```
